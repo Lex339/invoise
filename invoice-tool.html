@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>請求書作成ツール</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 40px;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .issuer-info {
+      text-align: right;
+    }
+
+    .issuer-info p {
+      margin: 2px 0;
+    }
+
+    #seal {
+      width: 100px;
+      opacity: 0.85;
+      display: none;
+      margin-top: 4px;
+    }
+
+    table, th, td {
+      border: 1px solid #ccc;
+      border-collapse: collapse;
+      padding: 8px;
+    }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+    }
+
+    .btn {
+      margin-top: 10px;
+    }
+
+    /* 印刷時に非表示にする要素 */
+    @media print {
+      .no-print {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="totals">
+      <h2>請求合計</h2>
+      <p>小計: <span id="subtotal">0</span> 円</p>
+      <p>消費税(10%): <span id="tax">0</span> 円</p>
+      <p><strong>合計: <span id="total">0</span> 円</strong></p>
+    </div>
+    <div class="issuer-info">
+      <label>発行者（自分）: <input type="text" id="issuer" placeholder="名前・会社名など"></label><br>
+      <label>住所: <input type="text" id="address" placeholder="住所・電話番号など"></label>
+      <br>
+      <img id="seal" alt="電子印鑑">
+    </div>
+  </div>
+
+  <label>請求先: <input type="text" id="client" placeholder="取引先名"></label><br><br>
+  <label>請求日: <input type="date" id="date"></label><br><br>
+
+  <h2>請求内容</h2>
+  <table id="items">
+    <thead>
+      <tr>
+        <th>品目</th>
+        <th>単価</th>
+        <th>数量</th>
+        <th>小計</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="item-body">
+      <!-- 動的に行が追加されます -->
+    </tbody>
+  </table>
+  <button onclick="addItem()" class="no-print">＋項目を追加</button>
+
+  <h2 class="no-print">電子印鑑の作成</h2>
+  <div class="no-print">
+    <label>印鑑の名前: <input type="text" id="sealName" placeholder="例: 山田" maxlength="4"></label>
+    <button onclick="generateSeal()">ハンコを作成して押す</button><br><br>
+  </div>
+
+  <button onclick="window.print()" class="btn no-print">🖨 印刷・PDF出力</button>
+
+  <canvas id="sealCanvas" width="120" height="120" style="display: none;"></canvas>
+
+  <script>
+    function addItem() {
+      const tbody = document.getElementById('item-body');
+      const row = document.createElement('tr');
+
+      row.innerHTML = `
+        <td><input type="text" class="item-name"></td>
+        <td><input type="number" class="item-price" value="0" onchange="updateTotal()"></td>
+        <td><input type="number" class="item-qty" value="1" onchange="updateTotal()"></td>
+        <td class="item-subtotal">0</td>
+        <td><button class="no-print" onclick="this.closest('tr').remove(); updateTotal();">削除</button></td>
+      `;
+
+      tbody.appendChild(row);
+      updateTotal();
+    }
+
+    function updateTotal() {
+      let subtotal = 0;
+      document.querySelectorAll('#item-body tr').forEach(row => {
+        const price = parseFloat(row.querySelector('.item-price').value || 0);
+        const qty = parseFloat(row.querySelector('.item-qty').value || 0);
+        const sub = price * qty;
+        row.querySelector('.item-subtotal').innerText = sub.toFixed(0);
+        subtotal += sub;
+      });
+      const tax = subtotal * 0.10;
+      const total = subtotal + tax;
+
+      document.getElementById('subtotal').innerText = subtotal.toFixed(0);
+      document.getElementById('tax').innerText = tax.toFixed(0);
+      document.getElementById('total').innerText = total.toFixed(0);
+    }
+
+    function generateSeal() {
+      const name = document.getElementById('sealName').value.trim();
+      if (!name) return alert("名前を入力してください");
+
+      const canvas = document.getElementById('sealCanvas');
+      const ctx = canvas.getContext('2d');
+      const sealImg = document.getElementById('seal');
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.beginPath();
+      ctx.arc(60, 60, 50, 0, Math.PI * 2);
+      ctx.strokeStyle = "red";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      ctx.fillStyle = "red";
+      ctx.font = "bold 28px serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(name, 60, 60);
+
+      const dataURL = canvas.toDataURL();
+      sealImg.src = dataURL;
+      sealImg.style.display = 'block';
+    }
+
+    // 初期行追加
+    addItem();
+  </script>
+</body>
+</html>
