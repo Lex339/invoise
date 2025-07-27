@@ -28,8 +28,9 @@
     }
 
     #seal {
-      width: 100px;
-      opacity: 0.85;
+      width: 80px;
+      height: 80px;
+      opacity: 0.9;
       display: none;
       margin-top: 4px;
     }
@@ -48,7 +49,6 @@
       margin-top: 10px;
     }
 
-    /* 印刷時に非表示にする要素 */
     @media print {
       .no-print {
         display: none !important;
@@ -57,39 +57,43 @@
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="totals">
-      <h2>請求合計</h2>
-      <p>小計: <span id="subtotal">0</span> 円</p>
-      <p>消費税(10%): <span id="tax">0</span> 円</p>
-      <p><strong>合計: <span id="total">0</span> 円</strong></p>
+
+  <div id="invoice-area">
+    <div class="header">
+      <div class="totals">
+        <h2>請求合計</h2>
+        <p>小計: <span id="subtotal">0</span> 円</p>
+        <p>消費税(10%): <span id="tax">0</span> 円</p>
+        <p><strong>合計: <span id="total">0</span> 円</strong></p>
+      </div>
+      <div class="issuer-info">
+        <label>発行者（自分）: <input type="text" id="issuer" placeholder="名前・会社名など"></label><br>
+        <label>住所: <input type="text" id="address" placeholder="住所・電話番号など"></label>
+        <br>
+        <img id="seal" alt="電子印鑑">
+      </div>
     </div>
-    <div class="issuer-info">
-      <label>発行者（自分）: <input type="text" id="issuer" placeholder="名前・会社名など"></label><br>
-      <label>住所: <input type="text" id="address" placeholder="住所・電話番号など"></label>
-      <br>
-      <img id="seal" alt="電子印鑑">
-    </div>
+
+    <label>請求先: <input type="text" id="client" placeholder="取引先名"></label><br><br>
+    <label>請求日: <input type="date" id="date"></label><br><br>
+
+    <h2>請求内容</h2>
+    <table id="items">
+      <thead>
+        <tr>
+          <th>品目</th>
+          <th>単価</th>
+          <th>数量</th>
+          <th>小計</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="item-body">
+        <!-- 動的に行が追加されます -->
+      </tbody>
+    </table>
   </div>
 
-  <label>請求先: <input type="text" id="client" placeholder="取引先名"></label><br><br>
-  <label>請求日: <input type="date" id="date"></label><br><br>
-
-  <h2>請求内容</h2>
-  <table id="items">
-    <thead>
-      <tr>
-        <th>品目</th>
-        <th>単価</th>
-        <th>数量</th>
-        <th>小計</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="item-body">
-      <!-- 動的に行が追加されます -->
-    </tbody>
-  </table>
   <button onclick="addItem()" class="no-print">＋項目を追加</button>
 
   <h2 class="no-print">電子印鑑の作成</h2>
@@ -98,9 +102,12 @@
     <button onclick="generateSeal()">ハンコを作成して押す</button><br><br>
   </div>
 
-  <button onclick="window.print()" class="btn no-print">🖨 印刷・PDF出力</button>
+  <button onclick="window.print()" class="btn no-print">🖨 通常印刷</button>
+  <button onclick="downloadPDF()" class="btn no-print">📄 PDF保存・印刷</button>
 
-  <canvas id="sealCanvas" width="120" height="120" style="display: none;"></canvas>
+  <canvas id="sealCanvas" width="80" height="80" style="display: none;"></canvas>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
   <script>
     function addItem() {
@@ -144,23 +151,41 @@
       const ctx = canvas.getContext('2d');
       const sealImg = document.getElementById('seal');
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // サイズ調整（約20mm相当）
+      canvas.width = 80;
+      canvas.height = 80;
 
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.beginPath();
-      ctx.arc(60, 60, 50, 0, Math.PI * 2);
+      ctx.arc(40, 40, 35, 0, Math.PI * 2);
       ctx.strokeStyle = "red";
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 3;
       ctx.stroke();
 
       ctx.fillStyle = "red";
-      ctx.font = "bold 28px serif";
+      ctx.font = "bold 16px serif";
       ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(name, 60, 60);
+
+      const startY = 40 - (name.length - 1) * 10;
+      for (let i = 0; i < name.length; i++) {
+        ctx.fillText(name[i], 40, startY + i * 20);
+      }
 
       const dataURL = canvas.toDataURL();
       sealImg.src = dataURL;
       sealImg.style.display = 'block';
+    }
+
+    function downloadPDF() {
+      const element = document.getElementById('invoice-area');
+      const opt = {
+        margin:       0.3,
+        filename:     'invoice.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(element).save();
     }
 
     // 初期行追加
