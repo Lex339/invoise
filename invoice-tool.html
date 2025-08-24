@@ -5,222 +5,295 @@
   <title>請求書</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 40px;
-      max-width: 800px;
-      margin: auto;
-    }
+    body { font-family: sans-serif; padding: 40px; max-width: 900px; margin: auto; }
+    #seal { width: 80px; opacity: 0.85; display: none; margin-left: 10px; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 8px; }
+    input[type="text"], input[type="number"], input[type="date"] { width: 100%; box-sizing: border-box; }
+    .title { font-size: 28px; font-weight: bold; margin-bottom: 20px; text-align: center; }
+    .issuer-box { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .issuer-details { display: flex; align-items: flex-start; gap: 12px; }
+    .issuer-grid { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; align-items: center; min-width: 420px; }
+    .left-total { font-size: 18px; font-weight: bold; min-width: 260px; }
+    fieldset { border: 1px solid #ccc; padding: 12px; margin: 18px 0; }
+    legend { padding: 0 6px; font-weight: bold; }
+    .row { display: grid; grid-template-columns: 140px 1fr 140px 1fr; gap: 8px 12px; align-items: center; }
+    .no-wrap { white-space: nowrap; }
 
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 20px;
-    }
+    /* ▼ 追加：外税/内税の2カラム合計表示 */
+    .totals-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .totals-col { border: 1px solid #ccc; padding: 10px; }
+    .totals-title { font-weight: bold; margin-bottom: 6px; }
 
-    .issuer-info {
-      text-align: left;
-      display: flex;
-      flex-direction: column;
-    }
+    /* A4縦 & 余白（少しだけ詰める） */
+    @page { size: A4 portrait; margin: 10mm; }
 
-    .issuer-info p {
-      margin: 2px 0;
-    }
-
-    #seal {
-      width: 80px;
-      opacity: 0.85;
-      display: none;
-      margin-left: 10px;
-    }
-
-    table, th, td {
-      border: 1px solid #ccc;
-      border-collapse: collapse;
-      padding: 8px;
-    }
-
-    input[type="text"], input[type="number"] {
-      width: 100%;
-    }
-
-    .btn {
-      margin-top: 10px;
-    }
-
-    .title {
-      font-size: 28px;
-      font-weight: bold;
-      margin-bottom: 20px;
-      text-align: center;
-    }
-
-    .top-section {
-      margin-bottom: 30px;
-    }
-
-    .issuer-box {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-    }
-
-    .issuer-details {
-      display: flex;
-      align-items: flex-start;
-    }
-
-    .issuer-text {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .left-total {
-      font-size: 18px;
-      font-weight: bold;
-    }
-
-    /* 印刷時に非表示にする要素 */
+    /* 印刷用スタイル（前回どおり＋2カラムも有効） */
     @media print {
-      .no-print {
-        display: none !important;
+      .no-print, .no-print * { display: none !important; }
+      input, button { appearance: none; }
+      body { padding: 0 !important; }
+
+      table, thead, tbody, tr, td, th, fieldset, .no-break {
+        break-inside: avoid; page-break-inside: avoid;
       }
+
+      .title { font-size: 22px; margin-bottom: 12px; }
+      fieldset { margin: 12px 0; }
+      legend { font-size: 0.95em; }
+
+      /* ベース縮小（90%） */
+      #sheet { font-size: 0.90em; line-height: 1.25; }
+      #sheet table td, #sheet table th { padding: 5px; }
+
+      /* さらに足りなければ段階的に縮小（beforeprintで自動付与） */
+      .print-fit-85 #sheet { font-size: 0.85em; }
+      .print-fit-85 #sheet table td, .print-fit-85 #sheet table th { padding: 4px; }
+
+      .print-fit-80 #sheet { font-size: 0.80em; }
+      .print-fit-80 #sheet table td, .print-fit-80 #sheet table th { padding: 3px; }
+
+      .print-fit-75 #sheet { font-size: 0.75em; }
+      .print-fit-75 #sheet table td, .print-fit-75 #sheet table th { padding: 2px; }
+
+      #items { table-layout: fixed; }
+      #items td, #items th { line-height: 1.2; }
     }
   </style>
 </head>
 <body>
-  <div class="top-section">
+  <div id="sheet">
     <div class="title">請求書</div>
-  </div>
 
-  <div class="issuer-box">
-    <div class="left-total">
-      合計金額（消費税込）: <span id="total">0</span> 円
-    </div>
-    <div class="issuer-details">
-      <div class="issuer-text">
-        <label>発行者（自分）:<br><input type="text" id="issuer" placeholder="名前・会社名など"></label><br>
-        <label>住所:<br><input type="text" id="address" placeholder="住所・電話番号など"></label><br>
+    <div class="issuer-box">
+      <div class="left-total">合計金額（消費税込）: <span id="total">0</span> 円</div>
+      <div class="issuer-details">
+        <div class="issuer-grid">
+          <label for="issuer">発行者（自分）</label><input type="text" id="issuer" placeholder="名前・会社名など">
+          <label for="address">住所</label><input type="text" id="address" placeholder="住所">
+          <label for="phone">電話番号</label><input type="text" id="phone" placeholder="例: 03-1234-5678">
+          <label for="regno">登録番号</label><input type="text" id="regno" placeholder="例: T1234567890123">
+        </div>
+        <img id="seal" alt="電子印鑑">
       </div>
-      <img id="seal" alt="電子印鑑">
+    </div>
+
+    <fieldset>
+      <legend>請求情報</legend>
+      <div class="row">
+        <label for="client">請求先</label><input type="text" id="client" placeholder="取引先名">
+        <label for="date">請求日</label><input type="date" id="date">
+      </div>
+    </fieldset>
+
+    <!-- 税率/モードは印刷時は非表示 -->
+    <fieldset class="no-print">
+      <legend>消費税設定（共通税率・表示モード）</legend>
+      <div class="row" style="grid-template-columns: 140px 1fr;">
+        <label class="no-wrap" for="taxRate">税率</label>
+        <div><input type="number" id="taxRate" value="10" min="0" step="0.1" oninput="updateTotal()"> %</div>
+      </div>
+      <label style="display:block; margin-top:8px;">
+        <input type="checkbox" id="simpleInclusive" onchange="updateTotal()">
+        内税を「税込 × 税率」で表示する（簡易モード／表示のみ）
+      </label>
+    </fieldset>
+
+    <h2>請求内容</h2>
+    <table id="items">
+      <thead>
+        <tr>
+          <th style="width:34%">品目</th>
+          <th style="width:14%">単価</th>
+          <th style="width:12%">数量</th>
+          <th style="width:14%">税区分</th>
+          <th style="width:14%">小計</th>
+          <th style="width:12%"></th>
+        </tr>
+      </thead>
+      <tbody id="item-body"></tbody>
+    </table>
+    <button onclick="addItem()" class="no-print">＋項目を追加</button>
+    <button onclick="addGasolineItem()" class="no-print">＋ガソリン項目を追加</button>
+
+    <fieldset class="no-print">
+      <legend>電子印鑑の作成</legend>
+      <div class="row" style="grid-template-columns: 140px 1fr;">
+        <label for="sealName">印鑑の名前</label>
+        <input type="text" id="sealName" placeholder="例: 山田" maxlength="4">
+      </div>
+      <button onclick="generateSeal()">ハンコを作成して押す</button>
+    </fieldset>
+
+    <!-- 口座情報は必須なので印刷でも出す -->
+    <fieldset>
+      <legend>振込先（銀行口座）</legend>
+      <div class="row">
+        <label for="bankName">銀行名</label><input type="text" id="bankName" placeholder="例: 〇〇銀行">
+        <label for="branchName">支店名</label><input type="text" id="branchName" placeholder="例: 本店営業部">
+        <label for="acctType">口座種別</label><input type="text" id="acctType" placeholder="例: 普通 / 当座">
+        <label for="acctNumber">口座番号</label><input type="text" id="acctNumber" placeholder="例: 1234567">
+        <label for="acctHolder">口座名義</label><input type="text" id="acctHolder" placeholder="例: カ）ヤマダショウジ">
+      </div>
+    </fieldset>
+
+    <!-- ▼ 合計：外税（左）・内税（右）の2カラムに変更 -->
+    <h2>請求合計</h2>
+    <fieldset class="totals-grid">
+      <div class="totals-col">
+        <div class="totals-title">外税（税抜単価の明細）</div>
+        <p>小計（税抜）: <span id="exSubtotal">0</span> 円</p>
+        <p>消費税(<span id="taxRateView">10</span>%): <span id="exTax">0</span> 円</p>
+        <p>小計（税込）: <span id="exTotal">0</span> 円</p>
+      </div>
+      <div class="totals-col">
+        <div class="totals-title">内税（税込単価の明細）</div>
+        <p>小計（税込）: <span id="inTotal">0</span> 円</p>
+        <p>うち消費税: <span id="inTax">0</span> 円</p>
+      </div>
+    </fieldset>
+
+    <p><strong>合計（支払額）: <span id="total">0</span> 円</strong></p>
+
+    <div class="no-print" style="display:flex; gap:8px;">
+      <button onclick="window.print()">🖨 印刷・PDF出力</button>
     </div>
   </div>
 
-  <label>請求先: <input type="text" id="client" placeholder="取引先名"></label><br><br>
-  <label>請求日: <input type="date" id="date"></label><br><br>
-
-  <h2>請求内容</h2>
-  <table id="items">
-    <thead>
-      <tr>
-        <th>品目</th>
-        <th>単価</th>
-        <th>数量</th>
-        <th>小計</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody id="item-body">
-    </tbody>
-  </table>
-  <button onclick="addItem()" class="no-print">＋項目を追加</button>
-  <button onclick="addGasolineItem()" class="no-print">＋ガソリン項目を追加</button>
-
-  <h2 class="no-print">電子印鑑の作成</h2>
-  <div class="no-print">
-    <label>印鑑の名前: <input type="text" id="sealName" placeholder="例: 山田" maxlength="4"></label>
-    <button onclick="generateSeal()">ハンコを作成して押す</button><br><br>
-  </div>
-
-  <h2>請求合計</h2>
-  <p>小計: <span id="subtotal">0</span> 円</p>
-  <p>消費税(10%): <span id="tax">0</span> 円</p>
-  <p><strong>合計: <span id="total">0</span> 円</strong></p>
-
-  <button onclick="window.print()" class="btn no-print">🖨 印刷・PDF出力</button>
-
-  <canvas id="sealCanvas" width="120" height="120" style="display: none;"></canvas>
+  <canvas id="sealCanvas" width="120" height="120" style="display:none;"></canvas>
 
   <script>
     function addItem() {
       const tbody = document.getElementById('item-body');
+      if (tbody.children.length >= 20) {
+        alert('明細は最大20項目までにしてください。'); return;
+      }
       const row = document.createElement('tr');
-
       row.innerHTML = `
         <td><input type="text" class="item-name"></td>
-        <td><input type="number" class="item-price" value="0" onchange="updateTotal()"></td>
-        <td><input type="number" class="item-qty" value="1" onchange="updateTotal()"></td>
+        <td><input type="number" class="item-price" value="0" step="1" onchange="updateTotal()"></td>
+        <td><input type="number" class="item-qty" value="1" step="1" onchange="updateTotal()"></td>
+        <td>
+          <select class="item-tax" onchange="updateTotal()">
+            <option value="exclusive" selected>外税</option>
+            <option value="inclusive">内税</option>
+          </select>
+        </td>
         <td class="item-subtotal">0</td>
         <td><button class="no-print" onclick="this.closest('tr').remove(); updateTotal();">削除</button></td>
       `;
-
       tbody.appendChild(row);
       updateTotal();
     }
 
     function addGasolineItem() {
       const tbody = document.getElementById('item-body');
+      if (tbody.children.length >= 20) {
+        alert('明細は最大20項目までにしてください。'); return;
+      }
       const row = document.createElement('tr');
-
       row.innerHTML = `
         <td>ガソリン</td>
-        <td><input type="number" class="item-price" value="0" onchange="updateTotal()"></td>
-        <td><input type="number" class="item-qty" value="0" onchange="updateTotal()"></td>
+        <td><input type="number" class="item-price" value="0" step="1" onchange="updateTotal()"></td>
+        <td><input type="number" class="item-qty" value="0" step="1" onchange="updateTotal()"></td>
+        <td>
+          <select class="item-tax" onchange="updateTotal()">
+            <option value="exclusive" selected>外税</option>
+            <option value="inclusive">内税</option>
+          </select>
+        </td>
         <td class="item-subtotal">0</td>
         <td><button class="no-print" onclick="this.closest('tr').remove(); updateTotal();">削除</button></td>
       `;
-
       tbody.appendChild(row);
       updateTotal();
     }
 
     function updateTotal() {
-      let subtotal = 0;
-      document.querySelectorAll('#item-body tr').forEach(row => {
-        const price = parseFloat(row.querySelector('.item-price')?.value || 0);
-        const qty = parseFloat(row.querySelector('.item-qty')?.value || 0);
-        const sub = price * qty;
-        row.querySelector('.item-subtotal').innerText = sub.toFixed(0);
-        subtotal += sub;
-      });
-      const tax = subtotal * 0.10;
-      const total = subtotal + tax;
+      const ratePct = parseFloat(document.getElementById('taxRate').value || '10');
+      const rate = ratePct / 100;
+      const rateView = document.getElementById('taxRateView');
+      if (rateView) rateView.innerText = ratePct.toString();
 
-      document.getElementById('subtotal').innerText = subtotal.toFixed(0);
-      document.getElementById('tax').innerText = tax.toFixed(0);
-      document.getElementById('total').innerText = total.toFixed(0);
+      const simple = document.getElementById('simpleInclusive')?.checked;
+
+      let exSubtotal = 0, exTax = 0, exTotal = 0;
+      let inTotal = 0, inTaxCorrect = 0, inTaxSimple = 0;
+
+      document.querySelectorAll('#item-body tr').forEach(row => {
+        const price = parseFloat(row.querySelector('.item-price')?.value || '0');
+        const qty   = parseFloat(row.querySelector('.item-qty')?.value   || '0');
+        const mode  = row.querySelector('.item-tax')?.value || 'exclusive';
+        const amount = price * qty;
+
+        let rowTotal = 0;
+
+        if (mode === 'exclusive') {
+          const rowEx = amount;
+          const rowTax = Math.round(rowEx * rate);
+          rowTotal = rowEx + rowTax;
+          exSubtotal += rowEx; exTax += rowTax; exTotal += rowTotal;
+        } else {
+          const taxCorrect = Math.round(amount * (rate / (1 + rate)));
+          const taxSimple  = Math.round(amount * rate);
+          inTotal += amount;
+          inTaxCorrect += taxCorrect;
+          inTaxSimple  += taxSimple;
+          rowTotal = amount;
+        }
+
+        const cell = row.querySelector('.item-subtotal');
+        if (cell) cell.innerText = Math.round(rowTotal).toString();
+      });
+
+      document.getElementById('exSubtotal').innerText = Math.round(exSubtotal);
+      document.getElementById('exTax').innerText = Math.round(exTax);
+      document.getElementById('exTotal').innerText = Math.round(exTotal);
+      document.getElementById('inTotal').innerText = Math.round(inTotal);
+      document.getElementById('inTax').innerText = Math.round(simple ? inTaxSimple : inTaxCorrect);
+
+      const grand = Math.round(exTotal + inTotal);
+      document.querySelectorAll('#total').forEach(el => el.innerText = grand);
     }
 
     function generateSeal() {
       const name = document.getElementById('sealName').value.trim();
       if (!name) return alert("名前を入力してください");
-
       const canvas = document.getElementById('sealCanvas');
       const ctx = canvas.getContext('2d');
       const sealImg = document.getElementById('seal');
-
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.beginPath();
-      ctx.arc(60, 60, 38, 0, Math.PI * 2);
-      ctx.strokeStyle = "red";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      ctx.fillStyle = "red";
-      ctx.font = "bold 22px serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(name, 60, 60);
-
-      const dataURL = canvas.toDataURL();
-      sealImg.src = dataURL;
-      sealImg.style.display = 'block';
+      ctx.beginPath(); ctx.arc(60, 60, 38, 0, Math.PI * 2);
+      ctx.strokeStyle = "red"; ctx.lineWidth = 3; ctx.stroke();
+      const fontSize = 22, lineHeight = 24;
+      ctx.fillStyle = "red"; ctx.font = `bold ${fontSize}px serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const totalHeight = (name.length - 1) * lineHeight;
+      const startY = 60 - totalHeight / 2;
+      for (let i = 0; i < name.length; i++) ctx.fillText(name[i], 60, startY + i * lineHeight);
+      sealImg.src = canvas.toDataURL(); sealImg.style.display = 'block';
     }
 
+    /* === A4 1枚自動フィット（モバイルSafari/Chrome/Edge対応） === */
+    const MM_TO_PX = 96 / 25.4; // 1mm ≒ 3.78px
+    function printableHeightPx() { return (297 - (10 + 10)) * MM_TO_PX; } // 上下10mm
+    function fitsOnePage() {
+      const sheet = document.getElementById('sheet');
+      return sheet ? sheet.scrollHeight <= printableHeightPx() : true;
+    }
+    function clearFitClasses() {
+      document.documentElement.classList.remove('print-fit-85','print-fit-80','print-fit-75');
+    }
+    window.addEventListener('beforeprint', () => {
+      clearFitClasses();
+      if (!fitsOnePage()) document.documentElement.classList.add('print-fit-85');
+      if (!fitsOnePage()) document.documentElement.classList.add('print-fit-80');
+      if (!fitsOnePage()) document.documentElement.classList.add('print-fit-75');
+    });
+    window.addEventListener('afterprint', clearFitClasses);
+
+    // 初期行
     addItem();
+    document.getElementById('taxRate').addEventListener('change', updateTotal);
   </script>
 </body>
 </html>
